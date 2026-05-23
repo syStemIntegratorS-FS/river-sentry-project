@@ -16,9 +16,9 @@
         .settings-box h1 { text-align: center; margin-bottom: 20px; color: #4fc3f7; }
         .settings-box h3 { color: #ffc107; margin: 15px 0 10px 0; }
         input { width: 100%; padding: 10px; margin: 8px 0; background: #0f1217; border: 1px solid #2a2f38; color: white; border-radius: 8px; }
-        button { background: #4caf50; color: white; padding: 12px; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-size: 1.1em; font-weight: bold; margin: 10px 0; }
+        button { background: #4caf50; color: white; padding: 5px; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-size: 1.1em; font-weight: bold; margin: 10px 0; }
         button:hover { opacity: 0.9; }
-        .info-text { color: #8892b0; font-size: 0.75em; margin: 5px; font-style: italic; }
+        .info-text { color: #8892b0; font-size: 0.75em; margin: 5px;font-style: italic; }
         .admin-badge { background: #2e3f38; color: #4caf50; padding: 5px 8px; border-radius: 12px; font-size: 0.7em; margin-left: 10px; }
         
         /* Main Dashboard */
@@ -28,7 +28,7 @@
         .time-display { font-size: 2em; font-weight: bold; font-family: 'Courier New', monospace; margin: 8px 0; color: #4fc3f7; }
         .date-display { color: #8892b0; font-size: 0.85em; }
         
-        /* Stats Bar - Removed signalStatus since it doesn't exist */
+        /* Stats Bar */
         .stats-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
         .stat-card { background: #1a1e24; border-radius: 20px; padding: 16px; text-align: center; border: 1px solid #2a2f38; }
         .stat-value { font-size: 1.8em; font-weight: bold; margin-top: 6px; font-family: 'Courier New', monospace; }
@@ -114,7 +114,7 @@
         <div class="info-text">Admin account sees ALL sites from ALL locations</div>
         
         <button onclick="connectAndStart()">🔌 CONNECT & START</button>
-        <div class="info-text" style="margin-top:15px; text-align:left;">Credentials Saved to Browser - Don't Forget to Logout</div>
+        <div class="info-text" style="margin-top:15px; text-align:left;">Credentials Saved to Browser Don't Forget to Logout</div>
     </div>
 </div>
 
@@ -174,7 +174,6 @@
 <script>
     // ============================================
     // ADMIN DASHBOARD - Sees ALL sites via drm/admin/all
-    // Auto-registers site on ANY activity
     // ============================================
     
     let client = null;
@@ -376,11 +375,11 @@
                     <div class="site-status status-online">ONLINE</div>
                 </div>
                 <div class="alert-display">✅ NORMAL</div>
-                <div class="alert-message" style="font-size:0.9em; text-align:center; margin:10px 0; color:#8892b0;">${data.message}</div>
-                <div class="alert-instruction">${data.instruction}</div>
+                <div class="alert-message" style="font-size:0.9em; text-align:center; margin:10px 0; color:#8892b0;">River conditions normal</div>
+                <div class="alert-instruction">No action required</div>
                 <div class="site-footer">
-                    <span>📡 RSSI: <span class="rssi">${data.rssi !== null ? data.rssi : '--'}</span> dBm</span>
-                    <span class="last-update">🕐 ${data.lastUpdate || '--:--:--'}</span>
+                    <span>📡 RSSI: <span class="rssi">--</span> dBm</span>
+                    <span class="last-update">🕐 --:--:--</span>
                 </div>
             `;
             grid.appendChild(newCard);
@@ -431,14 +430,14 @@
                 statusSpan.innerHTML = 'ALERT';
             } else {
                 alertDisplay.innerHTML = '✅ NORMAL';
-                alertMsg.innerHTML = data.message;
-                alertInst.innerHTML = data.instruction;
+                alertMsg.innerHTML = 'River conditions normal';
+                alertInst.innerHTML = 'No action required';
                 statusSpan.innerHTML = 'ONLINE';
             }
             statusSpan.className = 'site-status status-online';
         }
         
-        if (data.rssi !== null) rssiSpan.innerHTML = data.rssi;
+        if (data.rssi) rssiSpan.innerHTML = data.rssi;
         if (data.lastUpdate) updateSpan.innerHTML = data.lastUpdate;
     }
 
@@ -451,49 +450,35 @@
     }
 
     // ============================================
-    // AUTO-REGISTER SITE ON ANY MESSAGE
+    // MESSAGE PROCESSING
     // ============================================
-    function registerSite(data) {
-        const location = data.location || 'Unknown';
-        const siteId = data.site_id || 'Unknown';
-        const siteKey = `${location}|${siteId}`;
+    function processMessage(data) {
+        const siteKey = `${data.location}|${data.site_id}`;
         
         if (!sites[siteKey]) {
             sites[siteKey] = {
-                location: location,
-                siteId: siteId,
+                location: data.location,
+                siteId: data.site_id,
                 alert: 'NORMAL',
-                message: 'Device online - awaiting first status',
-                instruction: 'No alerts, system normal',
+                message: '',
+                instruction: '',
                 rssi: null,
                 lastUpdate: null,
                 offline: false,
                 lastTimestamp: Date.now()
             };
             renderDashboard();
-            console.log('🏭 New site registered:', siteId, 'in', location);
         }
         
-        // Update timestamp on ANY activity
         sites[siteKey].lastTimestamp = Date.now();
-        sites[siteKey].offline = false;
-        
-        const now = new Date();
-        sites[siteKey].lastUpdate = now.toLocaleTimeString('en-PH', { hour12: false });
-        
-        return siteKey;
-    }
-
-    // ============================================
-    // MESSAGE PROCESSING - NO MISSING ELEMENT REFERENCES
-    // ============================================
-    function processMessage(data) {
-        const siteKey = registerSite(data);
-        
         sites[siteKey].alert = data.alert || 'NORMAL';
         sites[siteKey].message = data.message || '';
         sites[siteKey].instruction = data.instruction || '';
+        sites[siteKey].offline = false;
         if (data.rssi) sites[siteKey].rssi = data.rssi;
+        
+        const now = new Date();
+        sites[siteKey].lastUpdate = now.toLocaleTimeString('en-PH', { hour12: false });
         
         updateSiteCard(siteKey, sites[siteKey]);
         updateMainAlertCard();
@@ -505,19 +490,24 @@
             addLog('NORMAL', data.location, data.site_id, 'All Clear - River conditions normal', 'No action required');
         }
         
+        document.getElementById('lastUpdate').innerHTML = now.toLocaleTimeString('en-PH', { hour12: false });
+        if (data.rssi) document.getElementById('signalStatus').innerHTML = data.rssi;
         lastAnyMessage = Date.now();
     }
 
     function processTelemetry(data) {
-        const siteKey = registerSite(data);
-        
-        sites[siteKey].rssi = data.rssi;
-        
-        updateSiteCard(siteKey, sites[siteKey]);
-        updateMainAlertCard();
-        updateStats();
-        
+        const siteKey = `${data.location}|${data.site_id}`;
+        if (sites[siteKey]) {
+            sites[siteKey].lastTimestamp = Date.now();
+            sites[siteKey].rssi = data.rssi;
+            sites[siteKey].offline = false;
+            const now = new Date();
+            sites[siteKey].lastUpdate = now.toLocaleTimeString('en-PH', { hour12: false });
+            updateSiteCard(siteKey, sites[siteKey]);
+        }
         lastAnyMessage = Date.now();
+        document.getElementById('lastUpdate').innerHTML = new Date().toLocaleTimeString('en-PH', { hour12: false });
+        if (data.rssi) document.getElementById('signalStatus').innerHTML = data.rssi;
     }
 
     // ============================================
@@ -551,6 +541,7 @@
             return;
         }
         
+        // Admin subscribes to ALL sites
         const topic = "drm/admin/all";
         
         document.getElementById('dashboardSubtitle').innerHTML = "Admin Command Center | Monitoring ALL locations";
@@ -584,14 +575,14 @@
             textSpan.innerHTML = '✅ Admin Mode - All Sites';
             client.subscribe(topic, (err) => {
                 if (err) console.error('Subscribe error:', topic, err);
-                else console.log('✅ Subscribed to:', topic);
+                else console.log('Subscribed to:', topic);
             });
         });
         
         client.on('error', (err) => {
             console.error('❌ MQTT Error:', err);
             led.className = 'led led-offline';
-            textSpan.innerHTML = '❌ Connection error';
+            textSpan.innerHTML = '❌ Connection error - check settings';
         });
         
         client.on('close', () => {
@@ -616,9 +607,23 @@
     }
 
     // ============================================
-    // LIVE INDICATOR - FIXED (removed non-existent element)
+    // LIVE INDICATOR
     // ============================================
-    // Removed liveIndicator since it doesn't exist in Admin Dashboard
+    setInterval(() => {
+        const timeSince = (Date.now() - lastAnyMessage) / 1000;
+        const liveIndicator = document.getElementById('liveIndicator');
+        if (!liveIndicator) return;
+        if (timeSince < 15) {
+            liveIndicator.innerHTML = '● ONLINE';
+            liveIndicator.style.color = '#4caf50';
+        } else if (timeSince < 30) {
+            liveIndicator.innerHTML = '● DEGRADED';
+            liveIndicator.style.color = '#ff9800';
+        } else {
+            liveIndicator.innerHTML = '● OFFLINE';
+            liveIndicator.style.color = '#f44336';
+        }
+    }, 3000);
     
     // ============================================
     // INITIALIZATION
@@ -645,6 +650,8 @@
         updateTime();
         setInterval(updateTime, 1000);
         startOfflineDetection();
+        
+        // NO AUTO-CONNECT - User must click CONNECT button
     }
     
     init();
