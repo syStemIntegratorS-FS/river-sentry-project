@@ -19,17 +19,13 @@
         button { background: #4caf50; color: white; padding: 12px; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-size: 1.1em; font-weight: bold; }
         button:hover { opacity: 0.9; }
         .info-text { color: #8892b0; font-size: 0.75em; margin-top: 5px; }
-        .logout-btn { background: #f44336; margin-top: 10px; }
-        .logout-btn:hover { background: #d32f2f; }
         
         /* Main Dashboard */
-        .header { text-align: center; margin-bottom: 24px; padding: 16px; background: linear-gradient(135deg, #1a1e24, #0f1217); border-radius: 20px; border: 1px solid #2a2f38; position: relative; }
+        .header { text-align: center; margin-bottom: 24px; padding: 16px; background: linear-gradient(135deg, #1a1e24, #0f1217); border-radius: 20px; border: 1px solid #2a2f38; }
         .header h1 { font-size: 1.8em; background: linear-gradient(135deg, #4fc3f7, #0288d1); -webkit-background-clip: text; background-clip: text; color: transparent; }
         .subtitle { font-size: 0.8em; color: #8892b0; margin-top: 5px; }
         .time-display { font-size: 2em; font-weight: bold; font-family: 'Courier New', monospace; margin: 8px 0; color: #4fc3f7; }
         .date-display { color: #8892b0; font-size: 0.85em; }
-        .logout-icon { position: absolute; top: 20px; right: 20px; background: #f44336; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.8em; font-weight: bold; }
-        .logout-icon:hover { background: #d32f2f; }
         
         .alert-card { background: #1a1e24; border-radius: 24px; padding: 28px 20px; margin-bottom: 20px; text-align: center; border: 1px solid #2a2f38; }
         .alert-level { font-size: 2.5em; font-weight: 800; padding: 24px; border-radius: 20px; margin: 12px 0; }
@@ -92,6 +88,11 @@
         .hidden { display: none; }
         .reconnect-btn { float: right; cursor: pointer; color: #4fc3f7; text-decoration: underline; margin-left: 15px; }
         
+        /* Bottom Logout Button */
+        .bottom-logout { margin-top: 20px; text-align: center; }
+        .bottom-logout button { background: #f44336; width: auto; padding: 8px 24px; font-size: 0.9em; }
+        .bottom-logout button:hover { background: #d32f2f; }
+        
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #0f1217; border-radius: 10px; }
         ::-webkit-scrollbar-thumb { background: #2a2f38; border-radius: 10px; }
@@ -122,7 +123,6 @@
 <!-- MAIN DASHBOARD -->
 <div id="dashboardPage" class="container hidden">
     <div class="header">
-        <button class="logout-icon" onclick="logout()">🚪 LOGOUT</button>
         <h1 id="dashboardTitle">🌊 DRM River Monitor</h1>
         <div class="subtitle" id="dashboardSubtitle">Loading...</div>
         <div class="time-display" id="liveTime">--:--:--</div>
@@ -157,8 +157,13 @@
 
     <div class="status-bar">
         <span class="led led-waiting" id="statusLed"></span>
-        <span id="statusText">Establishing connection...</span>
-        <span class="reconnect-btn" onclick="forceReconnect()">🔄 Reconnect</span>
+        <span id="statusText">Not connected. Click CONNECT.</span>
+        <span class="reconnect-btn" onclick="showLoginPage()">🔌 Connect</span>
+    </div>
+
+    <!-- LOGOUT BUTTON AT BOTTOM -->
+    <div class="bottom-logout">
+        <button onclick="logout()">🚪 LOGOUT</button>
     </div>
 </div>
 
@@ -199,33 +204,38 @@
         return settings;
     }
 
-    function clearSettings() {
-        localStorage.removeItem('drm_settings');
-        localStorage.removeItem('drm_logs');
-    }
-
     // ============================================
-    // LOGOUT FUNCTION
+    // PAGE NAVIGATION
     // ============================================
-    function logout() {
-        // Disconnect MQTT
+    function showLoginPage() {
+        // Disconnect MQTT if connected
         if (client) {
             client.end(true);
             client = null;
         }
         
-        // Clear all data
+        // Clear data
         sites = {};
         alertLogs = [];
         
-        // Show login page, hide dashboard
+        // Show login, hide dashboard
         document.getElementById('loginPage').classList.remove('hidden');
         document.getElementById('dashboardPage').classList.add('hidden');
         
-        // Reset login form to saved settings (keep credentials for next login)
+        // Reload settings into form
         loadSettings();
-        
-        console.log('Logged out');
+    }
+
+    function showDashboard() {
+        document.getElementById('loginPage').classList.add('hidden');
+        document.getElementById('dashboardPage').classList.remove('hidden');
+    }
+
+    // ============================================
+    // LOGOUT
+    // ============================================
+    function logout() {
+        showLoginPage();
     }
 
     // ============================================
@@ -514,11 +524,6 @@
     // ============================================
     // MQTT CONNECTION
     // ============================================
-    function forceReconnect() {
-        if (client) client.end(true);
-        setTimeout(() => connectAndStart(), 500);
-    }
-
     function connectAndStart() {
         // Get and validate settings
         const settings = saveSettings();
@@ -537,8 +542,7 @@
         document.getElementById('dashboardSubtitle').innerHTML = `${location.toUpperCase()} | Flood Early Warning System`;
         
         // Show dashboard, hide login
-        document.getElementById('loginPage').classList.add('hidden');
-        document.getElementById('dashboardPage').classList.remove('hidden');
+        showDashboard();
         
         // Reset state
         sites = {};
@@ -548,6 +552,11 @@
         const textSpan = document.getElementById('statusText');
         led.className = 'led led-waiting';
         textSpan.innerHTML = 'Connecting to MQTT...';
+        
+        // Disconnect existing client if any
+        if (client) {
+            client.end(true);
+        }
         
         // Connect to MQTT
         client = mqtt.connect(settings.host, {
@@ -578,8 +587,7 @@
         client.on('close', () => {
             console.log('MQTT Connection closed');
             led.className = 'led led-offline';
-            textSpan.innerHTML = '❌ Disconnected - reconnecting...';
-            setTimeout(() => forceReconnect(), 5000);
+            textSpan.innerHTML = '❌ Disconnected';
         });
         
         client.on('message', (topic, payload) => {
@@ -642,16 +650,7 @@
         setInterval(updateTime, 1000);
         startOfflineDetection();
         
-        // Auto-connect if settings exist
-        const saved = localStorage.getItem('drm_settings');
-        if (saved) {
-            try {
-                const s = JSON.parse(saved);
-                if (s.host && s.username && s.location) {
-                    setTimeout(() => connectAndStart(), 500);
-                }
-            } catch(e) {}
-        }
+        // NO AUTO-CONNECT - User must click CONNECT button
     }
     
     init();
