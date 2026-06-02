@@ -454,7 +454,7 @@
                 alertInst.innerHTML = data.instruction;
                 statusSpan.innerHTML = 'ALERT';
             } else {
-                alertDisplay.innerHTML = '✅ NORMAL';
+                alertDisplay.innerHTML = ' NORMAL';
                 alertMsg.innerHTML = data.message;
                 alertInst.innerHTML = data.instruction;
                 statusSpan.innerHTML = 'ONLINE';
@@ -487,7 +487,7 @@
                 location: location,
                 siteId: siteId,
                 alert: 'NORMAL',
-                message: 'Device online - awaiting first status',
+                message: 'Device online',
                 instruction: 'No alerts, system normal',
                 rssi: null,
                 lastUpdate: null,

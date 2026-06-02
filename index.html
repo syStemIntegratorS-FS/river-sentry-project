@@ -108,8 +108,8 @@
         
         <h3>📨 MQTT Settings</h3>
         <input type="text" id="mqtt_host" placeholder="MQTT Host (wss://...)" value="wss://699cfaaf78a040b5a6ab0bb14948e8f1.s1.eu.hivemq.cloud:8884/mqtt">
-        <input type="text" id="mqtt_user" placeholder="Username" value="">
-        <input type="password" id="mqtt_pass" placeholder="Password" value="">
+        <input type="text" id="mqtt_user" placeholder="Username" value="Admin">
+        <input type="password" id="mqtt_pass" placeholder="Password" value="Admin12345">
         
         <h3>📍 Location Settings</h3>
         <input type="text" id="location" placeholder="Location (e.g., pototan)">
@@ -158,7 +158,8 @@
     <div class="status-bar">
         <span class="led led-waiting" id="statusLed"></span>
         <span id="statusText">Not connected. Click CONNECT.</span>
-        <span class="reconnect-btn" onclick="showLoginPage()">🔌 Connect</span>
+        <span class="reconnect-btn" onclick="forceReconnect()">🔄 Force Reconnect</span>
+        <span class="reconnect-btn" onclick="showLoginPage()" style="margin-left: 5px;">🔌 Change Location</span>
     </div>
 
     <!-- LOGOUT BUTTON AT BOTTOM -->
@@ -176,6 +177,9 @@
     let alertLogs = [];
     let lastAnyMessage = Date.now();
     let offlineCheckInterval = null;
+    let connectionCheckInterval = null;
+    let reconnectTimer = null;
+    let reconnectAttempts = 0;
 
     // ============================================
     // LOAD/SAVE SETTINGS
@@ -212,6 +216,14 @@
             client.end(true);
             client = null;
         }
+        if (connectionCheckInterval) {
+            clearInterval(connectionCheckInterval);
+            connectionCheckInterval = null;
+        }
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
         sites = {};
         alertLogs = [];
         document.getElementById('loginPage').classList.remove('hidden');
@@ -226,6 +238,23 @@
 
     function logout() {
         showLoginPage();
+    }
+
+    // ============================================
+    // FORCE RECONNECT FUNCTION
+    // ============================================
+    function forceReconnect() {
+        console.log("🔄 Force reconnecting...");
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+        if (client) {
+            client.end(true);
+        }
+        setTimeout(() => {
+            connectAndStart();
+        }, 500);
     }
 
     // ============================================
@@ -512,7 +541,7 @@
         offlineCheckInterval = setInterval(() => {
             const now = Date.now();
             for (let key in sites) {
-                if (sites[key].lastTimestamp && (now - sites[key].lastTimestamp) > 60000 && !sites[key].offline) {
+                if (sites[key].lastTimestamp && (now - sites[key].lastTimestamp) > 90000 && !sites[key].offline) {
                     sites[key].offline = true;
                     sites[key].alert = 'OFFLINE';
                     updateSiteCard(key, sites[key]);
@@ -520,11 +549,11 @@
                     updateMainUI();
                 }
             }
-        }, 10000);
+        }, 15000);
     }
 
     // ============================================
-    // MQTT CONNECTION
+    // MQTT CONNECTION WITH AUTO-RECONNECT
     // ============================================
     function connectAndStart() {
         const settings = saveSettings();
@@ -554,19 +583,29 @@
             client.end(true);
         }
         
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+        
+        reconnectAttempts = 0;
+        
         client = mqtt.connect(settings.host, {
             username: settings.username,
             password: settings.password,
             protocol: 'wss',
-            reconnectPeriod: 0,
+            reconnectPeriod: 5000,        // ✅ AUTO-RECONNECT every 5 seconds
             connectTimeout: 15000,
-            keepalive: 60
+            keepalive: 30,                // ✅ Send keepalive every 30 seconds
+            clean: true,
+            clientId: "drm_lgu_" + location + "_" + Date.now()  // ✅ Unique client ID
         });
         
         client.on('connect', () => {
             console.log('✅ MQTT Connected');
+            reconnectAttempts = 0;
             led.className = 'led led-online';
-            textSpan.innerHTML = `✅ Connected - ${location}`;
+            textSpan.innerHTML = `✅ Connected - ${location} (Auto-Reconnect ON)`;
             client.subscribe(topic, (err) => {
                 if (err) console.error('Subscribe error:', topic, err);
                 else console.log('✅ Subscribed to:', topic);
@@ -576,13 +615,13 @@
         client.on('error', (err) => {
             console.error('❌ MQTT Error:', err);
             led.className = 'led led-offline';
-            textSpan.innerHTML = '❌ Connection error';
+            textSpan.innerHTML = '❌ Connection error - auto-reconnecting...';
         });
         
         client.on('close', () => {
             console.log('MQTT Connection closed');
             led.className = 'led led-offline';
-            textSpan.innerHTML = '❌ Disconnected';
+            textSpan.innerHTML = '❌ Disconnected - auto-reconnecting...';
         });
         
         client.on('message', (topic, payload) => {
@@ -598,6 +637,17 @@
                 console.error('Parse error:', e); 
             }
         });
+        
+        // ✅ Start connection health check
+        if (connectionCheckInterval) {
+            clearInterval(connectionCheckInterval);
+        }
+        connectionCheckInterval = setInterval(() => {
+            if (client && !client.connected) {
+                console.log("⚠️ Client disconnected, attempting reconnect...");
+                forceReconnect();
+            }
+        }, 30000);
     }
 
     // ============================================
@@ -643,8 +693,6 @@
         updateTime();
         setInterval(updateTime, 1000);
         startOfflineDetection();
-        
-        // NO AUTO-CONNECT - User must click CONNECT button
     }
     
     init();
