@@ -18,7 +18,7 @@
         input { width: 100%; padding: 10px; margin: 8px 0; background: #0f1217; border: 1px solid #2a2f38; color: white; border-radius: 8px; }
         button { background: #4caf50; color: white; padding: 12px; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-size: 1.1em; font-weight: bold; }
         button:hover { opacity: 0.9; }
-        .info-text { color: #8892b0; font-size: 0.75em; margin-top: 5px; }
+        .info-text { color: #8892b0; font-size: 0.75em; margin: 5px; }
         
         /* Main Dashboard */
         .header { text-align: center; margin-bottom: 24px; padding: 16px; background: linear-gradient(135deg, #1a1e24, #0f1217); border-radius: 20px; border: 1px solid #2a2f38; }
@@ -113,10 +113,10 @@
         
         <h3>Location Settings</h3>
         <input type="text" id="location" placeholder="Location (e.g., Pototan)">
-        <div class="info-text">Enter your LGU location name | Case-sensitive</div>
-        
-        <button onclick="connectAndStart()">CONNECT & START</button>
+        <button style="margin-top:15px;" onclick="connectAndStart()">CONNECT & START</button>
+        <div class="info-text" style="margin-top:15px; text-align:center;">Enter your LGU location name | Case-sensitive</div>
         <div class="info-text" style="margin-top:15px; text-align:center;">Settings & History are saved to your browser</div>
+         
     </div>
 </div>
 
