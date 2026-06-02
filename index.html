@@ -323,7 +323,7 @@
             alertMessage.innerHTML = 'River conditions normal';
             alertAction.innerHTML = 'No action required';
             alertStatus.innerHTML = 'NORMAL';
-            document.title = 'DRM River Monitor';
+            document.title = 'DRM River Sentry';
         }
     }
 
@@ -566,7 +566,7 @@
         
         const topic = `lgu/${location}/#`;
         
-        document.getElementById('dashboardTitle').innerHTML = `🌊 DRM ${location.toUpperCase()} River Monitor`;
+        document.getElementById('dashboardTitle').innerHTML = ` DRM ${location.toUpperCase()} River Sentry`;
         document.getElementById('dashboardSubtitle').innerHTML = `${location.toUpperCase()} | Flood Early Warning System`;
         
         showDashboard();
