@@ -28,7 +28,7 @@
         .time-display { font-size: 2em; font-weight: bold; font-family: 'Courier New', monospace; margin: 8px 0; color: #4fc3f7; }
         .date-display { color: #8892b0; font-size: 0.85em; }
         
-        /* Stats Bar - Removed signalStatus since it doesn't exist */
+        /* Stats Bar */
         .stats-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
         .stat-card { background: #1a1e24; border-radius: 20px; padding: 16px; text-align: center; border: 1px solid #2a2f38; }
         .stat-value { font-size: 1.8em; font-weight: bold; margin-top: 6px; font-family: 'Courier New', monospace; }
@@ -108,8 +108,8 @@
         
         <h3>📨 MQTT Settings</h3>
         <input type="text" id="mqtt_host" placeholder="MQTT Host (wss://...)" value="wss://699cfaaf78a040b5a6ab0bb14948e8f1.s1.eu.hivemq.cloud:8884/mqtt">
-        <input type="text" id="mqtt_user" placeholder="Username" value="">
-        <input type="password" id="mqtt_pass" placeholder="Password" value="">
+        <input type="text" id="mqtt_user" placeholder="Username" value="Admin">
+        <input type="password" id="mqtt_pass" placeholder="Password" value="Admin12345">
         
         <div class="info-text">Admin account sees ALL sites from ALL locations</div>
         
@@ -162,7 +162,7 @@
     <div class="status-bar">
         <span class="led led-waiting" id="statusLed"></span>
         <span id="statusText">Not connected. Click CONNECT.</span>
-        <span class="reconnect-btn" onclick="showLoginPage()">🔌 Connect</span>
+        <span class="reconnect-btn" onclick="forceReconnect()">🔄 Force Reconnect</span>
     </div>
 
     <!-- Logout Button -->
@@ -174,7 +174,7 @@
 <script>
     // ============================================
     // ADMIN DASHBOARD - Sees ALL sites via drm/admin/all
-    // Auto-registers site on ANY activity
+    // WITH AUTO-RECONNECT FIX
     // ============================================
     
     let client = null;
@@ -182,6 +182,9 @@
     let alertLogs = [];
     let lastAnyMessage = Date.now();
     let offlineCheckInterval = null;
+    let reconnectAttempts = 0;
+    let reconnectTimer = null;
+    let connectionCheckInterval = null;
 
     // ============================================
     // LOAD/SAVE SETTINGS
@@ -216,6 +219,10 @@
             client.end(true);
             client = null;
         }
+        if (connectionCheckInterval) {
+            clearInterval(connectionCheckInterval);
+            connectionCheckInterval = null;
+        }
         sites = {};
         alertLogs = [];
         document.getElementById('loginPage').classList.remove('hidden');
@@ -230,6 +237,23 @@
 
     function logout() {
         showLoginPage();
+    }
+
+    // ============================================
+    // FORCE RECONNECT FUNCTION
+    // ============================================
+    function forceReconnect() {
+        console.log("🔄 Force reconnecting...");
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+        if (client) {
+            client.end(true);
+        }
+        setTimeout(() => {
+            connectAndStart();
+        }, 500);
     }
 
     // ============================================
@@ -474,7 +498,7 @@
             console.log('🏭 New site registered:', siteId, 'in', location);
         }
         
-        // Update timestamp on ANY activity
+        // Update timestamp on ANY activity - THIS KEEPS DEVICE ONLINE
         sites[siteKey].lastTimestamp = Date.now();
         sites[siteKey].offline = false;
         
@@ -485,7 +509,7 @@
     }
 
     // ============================================
-    // MESSAGE PROCESSING - NO MISSING ELEMENT REFERENCES
+    // MESSAGE PROCESSING
     // ============================================
     function processMessage(data) {
         const siteKey = registerSite(data);
@@ -512,12 +536,15 @@
         const siteKey = registerSite(data);
         
         sites[siteKey].rssi = data.rssi;
+        sites[siteKey].lastTimestamp = Date.now();  // CRITICAL - resets offline timer
+        sites[siteKey].offline = false;
         
         updateSiteCard(siteKey, sites[siteKey]);
         updateMainAlertCard();
         updateStats();
         
         lastAnyMessage = Date.now();
+        console.log("📡 Telemetry from", data.site_id, "RSSI:", data.rssi);
     }
 
     // ============================================
@@ -528,7 +555,7 @@
         offlineCheckInterval = setInterval(() => {
             const now = Date.now();
             for (let key in sites) {
-                if (sites[key].lastTimestamp && (now - sites[key].lastTimestamp) > 60000 && !sites[key].offline) {
+                if (sites[key].lastTimestamp && (now - sites[key].lastTimestamp) > 90000 && !sites[key].offline) {
                     sites[key].offline = true;
                     sites[key].alert = 'OFFLINE';
                     updateSiteCard(key, sites[key]);
@@ -537,11 +564,11 @@
                     updateStats();
                 }
             }
-        }, 10000);
+        }, 15000);
     }
 
     // ============================================
-    // MQTT CONNECTION
+    // MQTT CONNECTION WITH AUTO-RECONNECT
     // ============================================
     function connectAndStart() {
         const settings = saveSettings();
@@ -569,35 +596,52 @@
             client.end(true);
         }
         
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+        
+        // Reset reconnect attempts
+        reconnectAttempts = 0;
+        
         client = mqtt.connect(settings.host, {
             username: settings.username,
             password: settings.password,
             protocol: 'wss',
-            reconnectPeriod: 0,
+            reconnectPeriod: 5000,        // Auto-reconnect every 5 seconds
             connectTimeout: 15000,
-            keepalive: 60
+            keepalive: 30,                // Send keepalive every 30 seconds
+            clean: true,
+            clientId: "drm_admin_" + Date.now()
         });
         
         client.on('connect', () => {
             console.log('✅ Admin MQTT Connected');
+            reconnectAttempts = 0;
             led.className = 'led led-online';
-            textSpan.innerHTML = '✅ Admin Mode - All Sites';
+            textSpan.innerHTML = '✅ Admin Mode - All Sites (Auto-Reconnect ON)';
             client.subscribe(topic, (err) => {
                 if (err) console.error('Subscribe error:', topic, err);
                 else console.log('✅ Subscribed to:', topic);
             });
+            
+            // Send test message to confirm connection
+            client.publish("drm/admin/status", JSON.stringify({
+                type: "admin_online",
+                timestamp: Date.now()
+            }));
         });
         
         client.on('error', (err) => {
             console.error('❌ MQTT Error:', err);
             led.className = 'led led-offline';
-            textSpan.innerHTML = '❌ Connection error';
+            textSpan.innerHTML = '❌ Connection error - auto-reconnecting...';
         });
         
         client.on('close', () => {
             console.log('MQTT Connection closed');
             led.className = 'led led-offline';
-            textSpan.innerHTML = '❌ Disconnected';
+            textSpan.innerHTML = '❌ Disconnected - auto-reconnecting...';
         });
         
         client.on('message', (topic, payload) => {
@@ -606,6 +650,8 @@
                 console.log('📨 Received:', data);
                 if (data.type === 'telemetry') {
                     processTelemetry(data);
+                } else if (data.type === 'heartbeat') {
+                    processTelemetry(data);
                 } else {
                     processMessage(data);
                 }
@@ -613,13 +659,19 @@
                 console.error('Parse error:', e); 
             }
         });
+        
+        // Start connection health check
+        if (connectionCheckInterval) {
+            clearInterval(connectionCheckInterval);
+        }
+        connectionCheckInterval = setInterval(() => {
+            if (client && !client.connected) {
+                console.log("⚠️ Client disconnected, attempting reconnect...");
+                forceReconnect();
+            }
+        }, 30000);
     }
 
-    // ============================================
-    // LIVE INDICATOR - FIXED (removed non-existent element)
-    // ============================================
-    // Removed liveIndicator since it doesn't exist in Admin Dashboard
-    
     // ============================================
     // INITIALIZATION
     // ============================================
@@ -645,6 +697,19 @@
         updateTime();
         setInterval(updateTime, 1000);
         startOfflineDetection();
+        
+        // Auto-connect if credentials exist
+        const saved = localStorage.getItem('drm_admin_settings');
+        if (saved) {
+            try {
+                const s = JSON.parse(saved);
+                if (s.host && s.username) {
+                    setTimeout(() => {
+                        connectAndStart();
+                    }, 500);
+                }
+            } catch(e) {}
+        }
     }
     
     init();
