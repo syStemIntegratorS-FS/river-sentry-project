@@ -171,12 +171,7 @@
     </div>
 </div>
 
-<script>
-    // ============================================
-    // ADMIN DASHBOARD - Sees ALL sites via drm/admin/all
-    // WITH AUTO-RECONNECT FIX
-    // ============================================
-    
+<script> 
     let client = null;
     let sites = {};
     let alertLogs = [];
@@ -186,9 +181,6 @@
     let reconnectTimer = null;
     let connectionCheckInterval = null;
 
-    // ============================================
-    // LOAD/SAVE SETTINGS
-    // ============================================
     function loadSettings() {
         const saved = localStorage.getItem('drm_admin_settings');
         if (saved) {
@@ -211,9 +203,6 @@
         return settings;
     }
 
-    // ============================================
-    // PAGE NAVIGATION
-    // ============================================
     function showLoginPage() {
         if (client) {
             client.end(true);
@@ -239,9 +228,6 @@
         showLoginPage();
     }
 
-    // ============================================
-    // FORCE RECONNECT FUNCTION
-    // ============================================
     function forceReconnect() {
         console.log("Force reconnecting...");
         if (reconnectTimer) {
@@ -256,9 +242,6 @@
         }, 500);
     }
 
-    // ============================================
-    // UI FUNCTIONS
-    // ============================================
     function updateTime() {
         const now = new Date();
         document.getElementById('liveTime').innerHTML = now.toLocaleTimeString('en-PH', { hour12: false });
@@ -474,9 +457,6 @@
         }
     }
 
-    // ============================================
-    // AUTO-REGISTER SITE ON ANY MESSAGE
-    // ============================================
     function registerSite(data) {
         const location = data.location || 'Unknown';
         const siteId = data.site_id || 'Unknown';
@@ -498,7 +478,6 @@
             console.log('🏭 New site registered:', siteId, 'in', location);
         }
         
-        // Update timestamp on ANY activity - THIS KEEPS DEVICE ONLINE
         sites[siteKey].lastTimestamp = Date.now();
         sites[siteKey].offline = false;
         
@@ -508,9 +487,7 @@
         return siteKey;
     }
 
-    // ============================================
-    // MESSAGE PROCESSING
-    // ============================================
+   
     function processMessage(data) {
         const siteKey = registerSite(data);
         
@@ -547,9 +524,6 @@
         console.log("📡 Telemetry from", data.site_id, "RSSI:", data.rssi);
     }
 
-    // ============================================
-    // OFFLINE DETECTION
-    // ============================================
     function startOfflineDetection() {
         if (offlineCheckInterval) clearInterval(offlineCheckInterval);
         offlineCheckInterval = setInterval(() => {
@@ -567,9 +541,6 @@
         }, 15000);
     }
 
-    // ============================================
-    // MQTT CONNECTION WITH AUTO-RECONNECT
-    // ============================================
     function connectAndStart() {
         const settings = saveSettings();
         
@@ -601,7 +572,6 @@
             reconnectTimer = null;
         }
         
-        // Reset reconnect attempts
         reconnectAttempts = 0;
         
         client = mqtt.connect(settings.host, {
@@ -660,7 +630,6 @@
             }
         });
         
-        // Start connection health check
         if (connectionCheckInterval) {
             clearInterval(connectionCheckInterval);
         }
@@ -672,9 +641,6 @@
         }, 30000);
     }
 
-    // ============================================
-    // INITIALIZATION
-    // ============================================
     function init() {
         loadSettings();
         
@@ -698,7 +664,6 @@
         setInterval(updateTime, 1000);
         startOfflineDetection();
         
-        // Auto-connect if credentials exist
         const saved = localStorage.getItem('drm_admin_settings');
         if (saved) {
             try {
