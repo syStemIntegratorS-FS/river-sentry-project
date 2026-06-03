@@ -169,9 +169,6 @@
 </div>
 
 <script>
-    // ============================================
-    // GLOBAL VARIABLES
-    // ============================================
     let client = null;
     let sites = {};
     let alertLogs = [];
@@ -181,9 +178,6 @@
     let reconnectTimer = null;
     let reconnectAttempts = 0;
 
-    // ============================================
-    // LOAD/SAVE SETTINGS
-    // ============================================
     function loadSettings() {
         const saved = localStorage.getItem('drm_settings');
         if (saved) {
@@ -208,9 +202,6 @@
         return settings;
     }
 
-    // ============================================
-    // PAGE NAVIGATION
-    // ============================================
     function showLoginPage() {
         if (client) {
             client.end(true);
@@ -240,9 +231,6 @@
         showLoginPage();
     }
 
-    // ============================================
-    // FORCE RECONNECT FUNCTION
-    // ============================================
     function forceReconnect() {
         console.log("🔄 Force reconnecting...");
         if (reconnectTimer) {
@@ -257,9 +245,6 @@
         }, 500);
     }
 
-    // ============================================
-    // DASHBOARD UI FUNCTIONS
-    // ============================================
     function updateTime() {
         const now = new Date();
         document.getElementById('liveTime').innerHTML = now.toLocaleTimeString('en-PH', { hour12: false });
@@ -461,9 +446,7 @@
         }
     }
 
-    // ============================================
-    // UNIVERSAL REGISTRATION - Auto-register from ANY message
-    // ============================================
+  
     function registerSite(data) {
         const location = data.location || 'Unknown';
         const siteId = data.site_id || 'Unknown';
@@ -485,7 +468,7 @@
             console.log('🏭 New site auto-registered:', siteId, 'in', location);
         }
         
-        // Update timestamp on ANY activity
+        
         sites[siteKey].lastTimestamp = Date.now();
         sites[siteKey].offline = false;
         
@@ -495,9 +478,6 @@
         return siteKey;
     }
 
-    // ============================================
-    // MESSAGE PROCESSING - Auto-register on BOTH telemetry and status
-    // ============================================
     function processMessage(data) {
         const siteKey = registerSite(data);
         
@@ -533,9 +513,6 @@
         if (data.rssi) document.getElementById('signalStatus').innerHTML = data.rssi;
     }
 
-    // ============================================
-    // OFFLINE DETECTION
-    // ============================================
     function startOfflineDetection() {
         if (offlineCheckInterval) clearInterval(offlineCheckInterval);
         offlineCheckInterval = setInterval(() => {
@@ -552,9 +529,6 @@
         }, 15000);
     }
 
-    // ============================================
-    // MQTT CONNECTION WITH AUTO-RECONNECT
-    // ============================================
     function connectAndStart() {
         const settings = saveSettings();
         const location = settings.location.trim();
@@ -596,7 +570,7 @@
             protocol: 'wss',
             reconnectPeriod: 5000,        //  AUTO-RECONNECT every 5 seconds
             connectTimeout: 15000,
-            keepalive: 30,                //  Send keepalive every 30 seconds
+            keepalive: 30,              
             clean: true,
             clientId: "drm_lgu_" + location + "_" + Date.now()  //  Unique client ID
         });
@@ -638,7 +612,7 @@
             }
         });
         
-        // ✅ Start connection health check
+     
         if (connectionCheckInterval) {
             clearInterval(connectionCheckInterval);
         }
@@ -650,9 +624,7 @@
         }, 30000);
     }
 
-    // ============================================
-    // LIVE INDICATOR
-    // ============================================
+   
     setInterval(() => {
         const timeSince = (Date.now() - lastAnyMessage) / 1000;
         const liveIndicator = document.getElementById('liveIndicator');
